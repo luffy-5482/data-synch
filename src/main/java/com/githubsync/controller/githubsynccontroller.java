@@ -27,7 +27,7 @@ public class githubsynccontroller {
             @RequestHeader(value = "X-GitHub-Delivery", required = false) String deliveryId,
             @RequestBody String payload) {
 
-        githubwebhookservice.processEvent(
+        githubwebhookservice.processWebhook(
                 event,
                 deliveryId,
                 payload

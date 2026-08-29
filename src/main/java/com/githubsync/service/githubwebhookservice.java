@@ -1,35 +1,101 @@
 package com.githubsync.service;
 
-import java.time.LocalDateTime;
-
 import org.springframework.stereotype.Service;
 
+import com.githubsync.dto.githubcommit;
 import com.githubsync.dto.githubevent;
+import com.githubsync.dto.githubpusheddata;
 import com.githubsync.repository.githubeventrepo;
+
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class githubwebhookservice {
-  private final githubeventrepo githubEventRepository;
+ 
+    private final githubeventrepo githubEventRepo;
+    private final ObjectMapper objectMapper;
 
-    public githubwebhookservice(githubeventrepo githubEventRepository) {
-        this.githubEventRepository = githubEventRepository;
+    public githubwebhookservice(
+            githubeventrepo githubEventRepo,
+            ObjectMapper objectMapper) {
+
+        this.githubEventRepo = githubEventRepo;
+        this.objectMapper = objectMapper;
     }
 
-    public void processEvent(
-            String eventType,
+    public void processWebhook(
             String deliveryId,
+            String eventType,
             String payload) {
 
-        githubevent event = new githubevent();
+        try {
 
-        event.setEventType(eventType);
-        event.setDeliveryId(deliveryId);
-        event.setPayload(payload);
-        event.setReceivedAt(LocalDateTime.now());
-        event.setProcessed(false);
+            // Convert JSON → Java object
 
-        githubEventRepository.save(event);
+            githubpusheddata githubData =
+                    objectMapper.readValue(
+                            payload,
+                            githubpusheddata.class
+                    );
 
-        System.out.println("GitHub event saved: " + eventType);
+            // Repository
+
+            System.out.println(
+                    "Repository: "
+                    + githubData.getRepository().getFull_name()
+            );
+
+            // Pusher
+
+            System.out.println(
+                    "Pusher: "
+                    + githubData.getPusher().getName()
+            );
+
+            System.out.println(
+                    "Pusher Email: "
+                    + githubData.getPusher().getEmail()
+            );
+
+            // Branch
+
+            System.out.println(
+                    "Branch: "
+                    + githubData.getRef()
+            );
+
+            // Commits
+
+            for (githubcommit commit : githubData.getCommits()) {
+
+                System.out.println(
+                        "Commit ID: "
+                        + commit.getId()
+                );
+
+                System.out.println(
+                        "Commit Message: "
+                        + commit.getMessage()
+                );
+            }
+
+            // Save original webhook
+
+            githubevent githubEvent = new githubevent();
+
+            githubEvent.setDeliveryId(deliveryId);
+            githubEvent.setEventType(eventType);
+            githubEvent.setPayload(payload);
+            githubEvent.setProcessed(false);
+
+            githubEventRepo.save(githubEvent);
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "Failed to process GitHub webhook",
+                    e
+            );
+        }
     }
 }
