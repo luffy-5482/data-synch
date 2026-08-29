@@ -39,7 +39,6 @@ public class githubwebhookservice {
                     );
 
             // Repository
-
             System.out.println(
                     "Repository: "
                     + githubData.getRepository().getFull_name()
