@@ -24,8 +24,8 @@ public class githubwebhookservice {
     }
 
     public void processWebhook(
-            String deliveryId,
             String eventType,
+            String deliveryId,
             String payload) {
 
         try {
