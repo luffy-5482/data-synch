@@ -6,20 +6,27 @@ import com.githubsync.dto.githubcommit;
 import com.githubsync.dto.githubevent;
 import com.githubsync.dto.githubpusheddata;
 import com.githubsync.repository.githubeventrepo;
+import com.githubsync.repository.userrepo;
 
 import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class githubwebhookservice {
- 
+
     private final githubeventrepo githubEventRepo;
+    private final userrepo userRepo;
+    private final emailservice emailService;
     private final ObjectMapper objectMapper;
 
     public githubwebhookservice(
             githubeventrepo githubEventRepo,
+            userrepo userRepo,
+            emailservice emailService,
             ObjectMapper objectMapper) {
 
         this.githubEventRepo = githubEventRepo;
+        this.userRepo = userRepo;
+        this.emailService = emailService;
         this.objectMapper = objectMapper;
     }
 
@@ -38,56 +45,99 @@ public class githubwebhookservice {
                             githubpusheddata.class
                     );
 
-            // Repository
-            System.out.println(
-                    "Repository: "
-                    + githubData.getRepository().getFull_name()
-            );
+            // -----------------------------
+            // 1. Extract repository
+            // -----------------------------
 
-            // Pusher
-
-            System.out.println(
-                    "Pusher: "
-                    + githubData.getPusher().getName()
-            );
+            String repositoryName =
+                    githubData.getRepository().getFull_name();
 
             System.out.println(
-                    "Pusher Email: "
-                    + githubData.getPusher().getEmail()
+                    "Repository: " + repositoryName
             );
 
-            // Branch
+
+            // -----------------------------
+            // 2. Extract pusher
+            // -----------------------------
+
+            String pusherName =
+                    githubData.getPusher().getName();
 
             System.out.println(
-                    "Branch: "
-                    + githubData.getRef()
+                    "Pusher: " + pusherName
             );
 
-            // Commits
 
-            for (githubcommit commit : githubData.getCommits()) {
+            // -----------------------------
+            // 3. Find registered user
+            // -----------------------------
 
-                System.out.println(
-                        "Commit ID: "
-                        + commit.getId()
-                );
+            userRepo
+                    .findByGithubUsername(pusherName)
+                    .ifPresentOrElse(
 
-                System.out.println(
-                        "Commit Message: "
-                        + commit.getMessage()
-                );
-            }
+                            registeredUser -> {
 
-            // Save original webhook
+                                System.out.println(
+                                        "Registered email: "
+                                        + registeredUser.getEmail()
+                                );
+
+                                // -----------------------------
+                                // 4. Process commits
+                                // -----------------------------
+
+                                for (githubcommit commit
+                                        : githubData.getCommits()) {
+
+                                    System.out.println(
+                                            "Commit ID: "
+                                            + commit.getId()
+                                    );
+
+                                    System.out.println(
+                                            "Commit Message: "
+                                            + commit.getMessage()
+                                    );
+
+                                    // -----------------------------
+                                    // 5. Send email
+                                    // -----------------------------
+
+                                    emailService.sendGithubNotification(
+                                            registeredUser.getEmail(),
+                                            repositoryName,
+                                            pusherName,
+                                            commit.getMessage()
+                                    );
+                                }
+                            },
+
+                            () -> {
+
+                                System.out.println(
+                                        "No registered user found for: "
+                                        + pusherName
+                                );
+
+                            }
+                    );
+
+
+            // -----------------------------
+            // 6. Store webhook
+            // -----------------------------
 
             githubevent githubEvent = new githubevent();
 
             githubEvent.setDeliveryId(deliveryId);
             githubEvent.setEventType(eventType);
             githubEvent.setPayload(payload);
-            githubEvent.setProcessed(false);
+            githubEvent.setProcessed(true);
 
             githubEventRepo.save(githubEvent);
+
 
         } catch (Exception e) {
 
